@@ -29,7 +29,7 @@ defmodule Peep.Storage do
   end
 
   def insert_metric(tid, %Metrics.Distribution{} = metric, value, tags) do
-    bucket = calculate_bucket(tid, value)
+    bucket = min(calculate_bucket(tid, value), metric.reporter_options[:max_idx])
     bucket_key = {metric, tags, bucket}
     sum_key = {metric, tags, :sum}
     :ets.update_counter(tid, bucket_key, {2, 1}, {bucket_key, 0})
@@ -159,8 +159,7 @@ defmodule Peep.Storage do
   defp init_distributions([], _gamma, _tid), do: :ok
 
   defp init_distributions([%Metrics.Distribution{} = metric | t], gamma, tid) do
-    max_value = metric.reporter_options[:max_value]
-    max_idx = ceil(:math.log(max_value) / :math.log(gamma))
+    max_idx = metric.reporter_options[:max_idx]
     # HACK: ignoring tags
     for idx <- :lists.seq(0, max_idx), do: :ets.insert(tid, {{metric, [], idx}, 0})
     init_distributions(t, gamma, tid)
