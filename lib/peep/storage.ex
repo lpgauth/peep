@@ -3,12 +3,13 @@ defmodule Peep.Storage do
   alias Telemetry.Metrics
 
   @spec new(atom, float) :: :ets.tid()
-  def new(name, alpha \\ 0.10) do
+  def new(name, alpha \\ 0.10, metrics) do
     tid = :ets.new(name, [:public, :named_table])
     gamma = (1 + alpha) / (1 - alpha)
     :ets.insert(name, {:gamma, gamma})
     denominator = :math.log(gamma)
     :ets.insert(name, {:denominator, denominator})
+    init_distributions(metrics, gamma, tid)
     tid
   end
 
@@ -154,4 +155,16 @@ defmodule Peep.Storage do
     [{:gamma, g}] = :ets.lookup(tid, :gamma)
     g
   end
+
+  defp init_distributions([], _gamma, _tid), do: :ok
+
+  defp init_distributions([%Metrics.Distribution{} = metric | t], gamma, tid) do
+    max_value = metric.reporter_options[:max_value]
+    max_idx = ceil(:math.log(max_value) / :math.log(gamma))
+    # HACK: ignoring tags
+    for idx <- :lists.seq(0, max_idx), do: :ets.insert(tid, {{metric, [], idx}, 0})
+    init_distributions(t, gamma, tid)
+  end
+
+  defp init_distributions([_ | t], gamma, tid), do: init_distributions(t, gamma, tid)
 end
