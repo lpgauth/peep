@@ -4,7 +4,15 @@ defmodule Peep.Storage do
 
   @spec new(atom, float) :: :ets.tid()
   def new(name, alpha \\ 0.10, metrics) do
-    tid = :ets.new(name, [:public, :named_table])
+    tid =
+      :ets.new(name, [
+        :public,
+        :named_table,
+        read_concurrency: false,
+        write_concurrency: true,
+        decentralized_counters: true
+      ])
+
     gamma = (1 + alpha) / (1 - alpha)
     :ets.insert(name, {:gamma, gamma})
     denominator = :math.log(gamma)
